@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LogIn, Search, ShieldCheck, Store } from 'lucide-react';
+import { ChevronDown, ExternalLink, LogIn, Search, ShieldCheck, Store } from 'lucide-react';
 import { Link, useLocation } from '../../lib/router';
 import { Logo } from '../../components/ui';
 
@@ -59,7 +59,7 @@ function SignInMenu() {
   );
 }
 
-export function PublicShell({ children }: { children: React.ReactNode }) {
+export function PublicShell({ children, poweredBy = false }: { children: React.ReactNode; poweredBy?: boolean }) {
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
       <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur">
@@ -91,6 +91,31 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link to="/admin/login" className="hover:text-ink">Super Admin sign in</Link>
           </nav>
         </div>
+        {poweredBy && (
+          <div className="border-t border-line">
+            <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-x-2 gap-y-1 px-4 py-4 text-center text-sm text-muted sm:flex-row sm:px-6">
+              <p className="inline-flex items-center gap-1.5">
+                <img src="/muqore-logo.png" alt="" width={20} height={20} className="size-5 shrink-0 mix-blend-multiply" />
+                <span>
+                  Powered by <span className="font-semibold text-ink">MuQore Innovation</span>
+                </span>
+              </p>
+              <span className="hidden sm:inline" aria-hidden>
+                ·
+              </span>
+              <a
+                href="https://www.muqoreinnovations.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-6 items-center gap-1 rounded font-semibold text-gold-ink underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-ink"
+              >
+                www.muqoreinnovations.com
+                <ExternalLink className="size-3.5" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
+          </div>
+        )}
       </footer>
     </div>
   );

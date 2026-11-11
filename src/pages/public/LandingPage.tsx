@@ -17,7 +17,7 @@ export function LandingPage() {
   ];
 
   return (
-    <PublicShell>
+    <PublicShell poweredBy>
       <section className="relative overflow-hidden">
         <div className="absolute -right-32 -top-40 size-[28rem] rounded-full bg-gold/35 blur-3xl" aria-hidden />
         <div className="absolute -left-40 top-40 size-[22rem] rounded-full bg-orange/25 blur-3xl" aria-hidden />
