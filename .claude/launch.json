@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "printflow",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "printflow-uitest",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "cross-env",
+        "PORT=3001",
+        "DATA_DIR=C:/Users/MALIKH~1/AppData/Local/Temp/claude/94b3e8d8da6d875e/7b5fb232-5bf3-4b24-9a9a-bb6bc286efbe/scratchpad/uitest-data",
+        "SUPER_ADMIN_USERNAME=uiadmin",
+        "SUPER_ADMIN_PASSWORD=UiTemp-1234",
+        "tsx",
+        "server/index.ts"
+      ],
+      "port": 3001
+    }
+  ]
+}
