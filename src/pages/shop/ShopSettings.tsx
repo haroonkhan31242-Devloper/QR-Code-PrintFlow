@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import type { Shop } from '../../../shared/types';
-import { api, ApiError } from '../../lib/api';
+import type { Shop } from '../../shared/types';
+import { shopService, ServiceError } from '../../services';
 import { useDocumentTitle } from '../../lib/router';
 import { Button, Card, CardHeader, PageHeader, Skeleton } from '../../components/ui';
 import { useToast } from '../../components/toast';
 import { ChangePasswordForm } from '../auth/ChangePasswordForm';
 import { ShopFields, validateShopForm, type ShopFormValues } from '../admin/ShopForm';
 import { useShop } from './ShopContext';
-import { DirectPrintingCard } from './printing';
 
 export function ShopSettings() {
   useDocumentTitle('Settings');
@@ -29,12 +28,12 @@ export function ShopSettings() {
     if (Object.keys(errs).length) return;
     setSaving(true);
     try {
-      const r = await api.put<{ shop: Shop }>('/api/shop/me', values);
+      const r = { shop: await shopService.updateMyShop(values) };
       setShop(r.shop);
       toast('success', 'Shop details saved');
     } catch (err) {
-      if (err instanceof ApiError && err.field) setErrors({ [err.field]: err.message });
-      else toast('error', 'Could not save', err instanceof ApiError ? err.message : undefined);
+      if (err instanceof ServiceError && err.field) setErrors({ [err.field]: err.message });
+      else toast('error', 'Could not save', err instanceof ServiceError ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -60,10 +59,6 @@ export function ShopSettings() {
           )}
         </Card>
         <div className="space-y-6">
-          <Card>
-            <CardHeader title="Direct printing" description="Print orders with one click, without a print dialog." />
-            <DirectPrintingCard />
-          </Card>
           <Card className="h-fit">
             <CardHeader title="Change password" description="Other devices are signed out after a change." />
             <div className="p-5 sm:p-6">

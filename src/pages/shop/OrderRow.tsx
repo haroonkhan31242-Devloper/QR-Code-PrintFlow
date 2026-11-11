@@ -1,5 +1,5 @@
 import { ChevronRight, Paperclip, Printer } from 'lucide-react';
-import type { Order } from '../../../shared/types';
+import type { Order } from '../../shared/types';
 import { Link } from '../../lib/router';
 import { COLOR_LABEL, formatMoney, timeAgo } from '../../lib/format';
 import { StatusBadge } from '../../components/ui';

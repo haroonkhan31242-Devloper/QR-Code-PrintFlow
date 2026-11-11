@@ -1,6 +1,0 @@
-{
-  "name": "PrintFlow QR SaaS",
-  "description": "QR-Based Multi-Shop Printing Management SaaS Platform connecting print shops and customers with instant document upload, dynamic pricing, and live tracking.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

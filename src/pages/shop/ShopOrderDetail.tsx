@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Download, Eye, FileImage, FileText, MessageCircle, Phone, Printer, Trash2, X } from 'lucide-react';
-import { ORDER_TRANSITIONS, type OrderDetail, type OrderStatus, type PrintJob } from '../../../shared/types';
-import { api, ApiError } from '../../lib/api';
-import { useApi, usePolling } from '../../lib/useApi';
+import { ORDER_TRANSITIONS, type OrderDetail, type OrderStatus } from '../../shared/types';
+import { shopService, ServiceError } from '../../services';
+import { useQuery } from '../../lib/useQuery';
 import { Link, navigate, useDocumentTitle, useLocation } from '../../lib/router';
-import { FilePreviewModal, PrintDialog, PrintJobsList, fileUrl, isPrintable } from './printing';
+import { DownloadButton, FilePreviewModal, FileThumb, PrintDialog, isPrintable } from './printing';
 import { COLOR_LABEL, FINISHING_LABEL, formatBytes, formatDateTime, formatMoney, SIDES_LABEL, STATUS_LABEL } from '../../lib/format';
 import { Alert, Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, Skeleton, StatusBadge, Textarea, Toggle } from '../../components/ui';
 import { ConfirmModal } from '../../components/shared';
@@ -21,7 +21,7 @@ const ACTION: Partial<Record<OrderStatus, { label: string; icon: React.ReactNode
 export function ShopOrderDetail({ id }: { id: string }) {
   const toast = useToast();
   const { refreshCounts } = useShop();
-  const { data, error, loading, reload, setData } = useApi<{ order: OrderDetail }>(`/api/shop/orders/${encodeURIComponent(id)}`);
+  const { data, error, loading, reload, setData } = useQuery<{ order: OrderDetail }>(`order:${id}`, async () => ({ order: await shopService.getOrder(id) }));
   const o = data?.order;
   useDocumentTitle(o ? `Order #${o.orderNo}` : 'Order');
 
@@ -37,10 +37,6 @@ export function ShopOrderDetail({ id }: { id: string }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
-  const jobsApi = useApi<{ jobs: PrintJob[] }>(`/api/shop/orders/${encodeURIComponent(id)}/print-jobs`);
-  const jobs = jobsApi.data?.jobs ?? [];
-  const jobsActive = jobs.some((j) => j.status === 'queued' || j.status === 'printing');
-  usePolling(() => jobsActive && jobsApi.reload(true), 2000);
 
   useEffect(() => {
     if (o) {
@@ -59,19 +55,6 @@ export function ShopOrderDetail({ id }: { id: string }) {
     }
   }, [o?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Toast when a direct print job finishes.
-  const prevJobs = React.useRef<Record<string, string>>({});
-  useEffect(() => {
-    for (const j of jobs) {
-      const before = prevJobs.current[j.id];
-      if (before && before !== j.status) {
-        if (j.status === 'done') toast('success', 'Sent to printer', `${j.printer} accepted the job. If nothing comes out, check the printer.`);
-        if (j.status === 'failed') toast('error', 'Printing failed', j.error ?? undefined);
-      }
-      prevJobs.current[j.id] = j.status;
-    }
-  }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
-
   if (error)
     return (
       <Card>
@@ -84,16 +67,15 @@ export function ShopOrderDetail({ id }: { id: string }) {
     );
   if (loading || !o) return <Skeleton className="h-[32rem]" />;
 
-  const apply = async (key: string, fn: () => Promise<{ order: OrderDetail }>, success: string) => {
+  const apply = async (key: string, fn: () => Promise<OrderDetail>, success: string) => {
     setBusy(key);
     try {
-      const r = await fn();
-      setData({ order: r.order });
+      setData({ order: await fn() });
       refreshCounts();
       toast('success', success);
       return true;
     } catch (err) {
-      toast('error', 'Could not update order', err instanceof ApiError ? err.message : undefined);
+      toast('error', 'Could not update order', err instanceof ServiceError ? err.message : undefined);
       return false;
     } finally {
       setBusy(null);
@@ -101,7 +83,7 @@ export function ShopOrderDetail({ id }: { id: string }) {
   };
 
   const setStatus = (status: OrderStatus, extra: Record<string, string> = {}) =>
-    apply(status, () => api.patch(`/api/shop/orders/${o.id}/status`, { status, ...extra }), `Order #${o.orderNo}: ${STATUS_LABEL[status]}`);
+    apply(status, () => shopService.setOrderStatus(o.id, status, extra), `Order #${o.orderNo}: ${STATUS_LABEL[status]}`);
 
   const next = ORDER_TRANSITIONS[o.status].filter((s) => s !== 'rejected');
   const canReject = ORDER_TRANSITIONS[o.status].includes('rejected');
@@ -116,7 +98,7 @@ export function ShopOrderDetail({ id }: { id: string }) {
       toast('error', 'Enter a valid amount');
       return;
     }
-    await apply('billing', () => api.patch(`/api/shop/orders/${o.id}/billing`, { finalAmount: value, paymentStatus: paid ? 'paid' : 'unpaid' }), 'Payment details saved');
+    await apply('billing', () => shopService.setBilling(o.id, value, paid ? 'paid' : 'unpaid'), 'Payment details saved');
   };
 
   return (
@@ -140,13 +122,12 @@ export function ShopOrderDetail({ id }: { id: string }) {
             <Button
               variant="dark"
               icon={<Printer className="size-4" />}
-              disabled={jobsActive}
               onClick={() => {
                 if (!selected.length) setSelected(printableFiles.map((f) => f.id));
                 setPrintOpen(true);
               }}
             >
-              {jobsActive ? 'Printing…' : 'Print'}
+              Print
             </Button>
           )}
           {canReject && (
@@ -196,7 +177,7 @@ export function ShopOrderDetail({ id }: { id: string }) {
                   />
                   {selected.length ? `${selected.length} of ${printableFiles.length} selected` : 'Select files to print'}
                 </label>
-                <Button size="sm" variant="dark" icon={<Printer className="size-4" />} disabled={!selected.length || jobsActive} onClick={() => setPrintOpen(true)}>
+                <Button size="sm" variant="dark" icon={<Printer className="size-4" />} disabled={!selected.length} onClick={() => setPrintOpen(true)}>
                   Print selected
                 </Button>
               </div>
@@ -223,14 +204,14 @@ export function ShopOrderDetail({ id }: { id: string }) {
                       aria-label={`Preview ${f.originalName}`}
                     >
                       {isImage && !f.purged ? (
-                        <img src={fileUrl(f, true)} alt="" loading="lazy" className="size-full object-cover" />
+                        <FileThumb file={f} />
                       ) : isImage ? (
                         <FileImage className="size-5" />
                       ) : (
                         <FileText className="size-5" />
                       )}
                     </button>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-[9rem] flex-1">
                       <p className="truncate text-sm font-semibold text-ink" title={f.originalName}>
                         {f.originalName}
                       </p>
@@ -246,9 +227,9 @@ export function ShopOrderDetail({ id }: { id: string }) {
                         <Button variant="secondary" size="sm" icon={<Eye className="size-4" />} onClick={() => setPreviewIndex(i)}>
                           Preview
                         </Button>
-                        <a href={fileUrl(f)} download className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-sm font-semibold text-ink hover:bg-cream" aria-label={`Download ${f.originalName}`}>
+                        <DownloadButton file={f} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-sm font-semibold text-ink hover:bg-cream">
                           <Download className="size-4" aria-hidden /> <span className="hidden sm:inline">Download</span>
-                        </a>
+                        </DownloadButton>
                       </div>
                     )}
                   </li>
@@ -256,23 +237,6 @@ export function ShopOrderDetail({ id }: { id: string }) {
               })}
             </ul>
           </Card>
-
-          {jobs.length > 0 && (
-            <Card>
-              <CardHeader title="Print jobs" description="Sent directly to the shop printer" />
-              <PrintJobsList
-                jobs={jobs}
-                onCancel={async (jobId) => {
-                  try {
-                    await api.post(`/api/shop/print-jobs/${jobId}/cancel`);
-                    jobsApi.reload(true);
-                  } catch (err) {
-                    toast('error', 'Could not cancel', err instanceof ApiError ? err.message : undefined);
-                  }
-                }}
-              />
-            </Card>
-          )}
 
           <Card>
             <CardHeader title="Print instructions" />
@@ -360,7 +324,6 @@ export function ShopOrderDetail({ id }: { id: string }) {
           setData({ order });
           refreshCounts();
         }}
-        onJobCreated={() => jobsApi.reload(true)}
       />
 
       <ConfirmModal
@@ -393,7 +356,7 @@ export function ShopOrderDetail({ id }: { id: string }) {
         danger
         loading={busy === 'purge'}
         onConfirm={async () => {
-          if (await apply('purge', () => api.del(`/api/shop/orders/${o.id}/files`), 'Files deleted')) setPurgeOpen(false);
+          if (await apply('purge', () => shopService.purgeOrderFiles(o.id), 'Files deleted')) setPurgeOpen(false);
         }}
       />
     </>

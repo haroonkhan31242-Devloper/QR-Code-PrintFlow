@@ -3,10 +3,12 @@ import { ArrowRight, FileUp, Printer, ScanLine, Search } from 'lucide-react';
 import { Link, navigate, useDocumentTitle } from '../../lib/router';
 import { Button, Card, Input } from '../../components/ui';
 import { PublicShell } from './PublicShell';
+import { QrScannerModal } from '../../components/QrScanner';
 
 export function LandingPage() {
   useDocumentTitle('');
   const [code, setCode] = useState('');
+  const [scanning, setScanning] = useState(false);
 
   const steps = [
     { icon: ScanLine, title: 'Scan the QR code', text: 'Find the PrintFlow QR code at the print shop counter and scan it with your phone camera.' },
@@ -29,8 +31,11 @@ export function LandingPage() {
           <p className="mt-5 max-w-xl text-lg text-ink-soft">
             Scan the shop’s QR code, upload your files and collect your prints. No app, no sign-up, no USB drives.
           </p>
+          <Button size="lg" className="mt-8" icon={<ScanLine className="size-5" />} onClick={() => setScanning(true)}>
+            Scan a shop QR code
+          </Button>
 
-          <Card className="mt-10 max-w-xl p-5 sm:p-6">
+          <Card className="mt-8 max-w-xl p-5 sm:p-6">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -91,6 +96,7 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+      <QrScannerModal open={scanning} onClose={() => setScanning(false)} />
     </PublicShell>
   );
 }

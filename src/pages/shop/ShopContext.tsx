@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react';
-import type { Shop } from '../../../shared/types';
-import { useApi, usePolling } from '../../lib/useApi';
+import type { Shop } from '../../shared/types';
+import { useQuery, usePolling } from '../../lib/useQuery';
+import { shopService } from '../../services';
 import { useTitleBadge } from '../../lib/router';
 
 interface ShopCtx {
@@ -14,8 +15,8 @@ const Ctx = createContext<ShopCtx>({ shop: null, setShop: () => {}, pendingCount
 export const useShop = () => useContext(Ctx);
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
-  const me = useApi<{ shop: Shop }>('/api/shop/me');
-  const counts = useApi<{ total: number }>('/api/shop/orders?status=pending&limit=1');
+  const me = useQuery<{ shop: Shop }>('shop-me', async () => ({ shop: await shopService.getMyShop() }));
+  const counts = useQuery<{ total: number }>('shop-pending-count', () => shopService.listOrders({ status: 'pending', limit: 1 }));
   usePolling(() => counts.reload(true), 20_000);
 
   const pendingCount = counts.data?.total ?? 0;

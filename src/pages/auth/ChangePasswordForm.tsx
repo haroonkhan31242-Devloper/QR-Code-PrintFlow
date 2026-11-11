@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { authService, ServiceError } from '../../services';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../components/toast';
 import { Alert, Button, Field, PasswordInput } from '../../components/ui';
-import type { SessionUser } from '../../../shared/types';
 
 export function ChangePasswordForm({ submitLabel = 'Update password', onDone }: { submitLabel?: string; onDone?: () => void }) {
   const { setUser } = useAuth();
@@ -28,16 +27,15 @@ export function ChangePasswordForm({ submitLabel = 'Update password', onDone }: 
 
     setSaving(true);
     try {
-      const r = await api.post<{ user: SessionUser }>('/api/auth/change-password', { currentPassword: current, newPassword: next });
-      setUser(r.user);
+      setUser(await authService.changePassword(current, next));
       setCurrent('');
       setNext('');
       setConfirm('');
       toast('success', 'Password updated', 'Other devices have been signed out.');
       onDone?.();
     } catch (err) {
-      if (err instanceof ApiError && err.field) setErrors({ [err.field]: err.message });
-      else setFormError(err instanceof ApiError ? err.message : 'Could not update password.');
+      if (err instanceof ServiceError && err.field) setErrors({ [err.field]: err.message });
+      else setFormError(err instanceof ServiceError ? err.message : 'Could not update password.');
     } finally {
       setSaving(false);
     }

@@ -4,7 +4,7 @@ import { navigate, useDocumentTitle } from '../../lib/router';
 import { Button, Card, Logo } from '../../components/ui';
 import { ChangePasswordForm } from './ChangePasswordForm';
 
-/** Shown after signing in with a temporary password. The server blocks every other API until it is changed. */
+/** Shown after signing in with a temporary password. Every other service call is blocked until it is changed. */
 export function ForcePasswordChange() {
   useDocumentTitle('Set a new password');
   const { user, logout } = useAuth();

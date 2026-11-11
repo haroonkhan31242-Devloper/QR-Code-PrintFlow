@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, Eye, EyeOff, Inbox, Loader2, X } from 'lucide-react';
-import type { OrderStatus } from '../../shared/types';
+import type { OrderStatus } from '../shared/types';
 import { STATUS_LABEL } from '../lib/format';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');

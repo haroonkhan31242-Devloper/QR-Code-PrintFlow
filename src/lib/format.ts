@@ -1,4 +1,4 @@
-import type { ColorMode, FinishingCode, OrderStatus, PaperSize, Sides } from '../../shared/types';
+import type { ColorMode, FinishingCode, OrderStatus, PaperSize, Sides } from '../shared/types';
 
 const currency = new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 });
 export const formatMoney = (n: number | null | undefined) => `Rs ${currency.format(n ?? 0)}`;

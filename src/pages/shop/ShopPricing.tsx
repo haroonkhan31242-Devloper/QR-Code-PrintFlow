@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { COLOR_MODES, PAPER_SIZES, type FinishingOption, type PriceRule } from '../../../shared/types';
-import { api, ApiError } from '../../lib/api';
-import { useApi } from '../../lib/useApi';
+import { COLOR_MODES, PAPER_SIZES, type FinishingOption, type PriceRule } from '../../shared/types';
+import { shopService, ServiceError } from '../../services';
+import { useQuery } from '../../lib/useQuery';
 import { useDocumentTitle } from '../../lib/router';
 import { COLOR_LABEL, FINISHING_LABEL } from '../../lib/format';
 import { Button, Card, CardHeader, ErrorState, Input, PageHeader, Skeleton, Toggle } from '../../components/ui';
@@ -13,7 +13,7 @@ const key = (size: string, mode: string) => `${size}:${mode}`;
 export function ShopPricing() {
   useDocumentTitle('Prices');
   const toast = useToast();
-  const { data, error, loading, reload, setData } = useApi<{ prices: PriceRule[]; finishing: FinishingOption[] }>('/api/shop/pricing');
+  const { data, error, loading, reload, setData } = useQuery<{ prices: PriceRule[]; finishing: FinishingOption[] }>('shop-pricing', shopService.getPricing);
   const [grid, setGrid] = useState<Grid>({});
   const [finishing, setFinishing] = useState<{ code: FinishingOption['code']; enabled: boolean; price: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -61,14 +61,14 @@ export function ShopPricing() {
     }
     setSaving(true);
     try {
-      const r = await api.put<{ prices: PriceRule[]; finishing: FinishingOption[] }>('/api/shop/pricing', {
+      const r = await shopService.savePricing({
         prices,
         finishing: finishing.map((f) => ({ code: f.code, enabled: f.enabled, price: Number(f.price) })),
       });
       setData(r);
       toast('success', 'Prices saved', 'Customers see the new prices right away.');
     } catch (err) {
-      toast('error', 'Could not save prices', err instanceof ApiError ? err.message : undefined);
+      toast('error', 'Could not save prices', err instanceof ServiceError ? err.message : undefined);
     } finally {
       setSaving(false);
     }

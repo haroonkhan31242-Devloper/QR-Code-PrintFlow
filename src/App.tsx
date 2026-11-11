@@ -5,7 +5,7 @@ import { matchPath, Redirect, useLocation } from './lib/router';
 import { ToastProvider } from './components/toast';
 import { Spinner } from './components/ui';
 import { DashboardLayout, type NavItem } from './components/DashboardLayout';
-import type { Role } from '../shared/types';
+import type { Role } from './shared/types';
 
 import { LandingPage } from './pages/public/LandingPage';
 import { CustomerUploadPage } from './pages/public/CustomerUploadPage';
@@ -28,7 +28,7 @@ import { ShopPricing } from './pages/shop/ShopPricing';
 import { ShopQrCode } from './pages/shop/ShopQrCode';
 import { ShopSettings } from './pages/shop/ShopSettings';
 
-/** Client-side guard for UX only. Every API call is also authorised on the server. */
+/** Route guard. Every service call also checks the signed-in user and role. */
 function RequireRole({ role, children }: { role: Role; children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { path } = useLocation();

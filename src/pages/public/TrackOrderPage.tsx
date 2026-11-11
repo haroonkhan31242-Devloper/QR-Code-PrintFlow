@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Check, PackageCheck, RefreshCw, Search, XCircle } from 'lucide-react';
-import { useApi, usePolling } from '../../lib/useApi';
+import { useQuery, usePolling } from '../../lib/useQuery';
+import { publicService } from '../../services';
 import { navigate, useDocumentTitle } from '../../lib/router';
 import { formatDateTime, formatMoney, STATUS_LABEL } from '../../lib/format';
-import type { OrderStatus, PublicTracking } from '../../../shared/types';
+import type { OrderStatus, PublicTracking } from '../../shared/types';
 import { Alert, Badge, Button, Card, EmptyState, ErrorState, Input, Skeleton, StatusBadge, cx } from '../../components/ui';
 import { PublicShell } from './PublicShell';
 
@@ -47,7 +48,7 @@ export function TrackOrderPage({ code }: { code?: string }) {
 }
 
 function TrackingResult({ code }: { code: string }) {
-  const { data, error, loading, reload } = useApi<{ order: PublicTracking }>(`/api/public/track/${encodeURIComponent(code)}`);
+  const { data, error, loading, reload } = useQuery<{ order: PublicTracking }>(`track:${code}`, async () => ({ order: await publicService.trackOrder(code) }));
   usePolling(() => reload(true), 30_000);
   const o = data?.order;
 

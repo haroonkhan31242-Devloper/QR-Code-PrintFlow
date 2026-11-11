@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ShieldCheck, Store } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
-import { ApiError } from '../../lib/api';
+import { ServiceError } from '../../services';
 import { Link, navigate, useDocumentTitle, useLocation } from '../../lib/router';
 import { Alert, Button, Field, Input, Logo, PasswordInput, Spinner } from '../../components/ui';
 
@@ -37,9 +37,9 @@ export function LoginPage({ portal }: { portal: 'admin' | 'shop' }) {
       await login(portal, username.trim(), password);
       navigate(target, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Sign in failed. Please try again.');
-      if (err instanceof ApiError && err.code === 'USE_ADMIN_LOGIN') setWrongPortal('admin');
-      else if (err instanceof ApiError && err.code === 'USE_SHOP_LOGIN') setWrongPortal('shop');
+      setError(err instanceof ServiceError ? err.message : 'Sign in failed. Please try again.');
+      if (err instanceof ServiceError && err.code === 'USE_ADMIN_LOGIN') setWrongPortal('admin');
+      else if (err instanceof ServiceError && err.code === 'USE_SHOP_LOGIN') setWrongPortal('shop');
       else setPassword('');
     } finally {
       setSubmitting(false);

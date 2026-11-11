@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ExternalLink, KeyRound, Power, Trash2 } from 'lucide-react';
-import type { ActivityEntry, ShopWithStats } from '../../../shared/types';
-import { api, ApiError } from '../../lib/api';
-import { useApi } from '../../lib/useApi';
+import type { ActivityEntry, ShopWithStats } from '../../shared/types';
+import { adminService, ServiceError } from '../../services';
+import { useQuery } from '../../lib/useQuery';
 import { Link, navigate, useDocumentTitle } from '../../lib/router';
 import { formatDate, formatDateTime, timeAgo } from '../../lib/format';
 import { Alert, Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, Skeleton } from '../../components/ui';
@@ -12,8 +12,8 @@ import { ShopFields, validateShopForm, type ShopFormValues } from './ShopForm';
 
 export function AdminShopDetail({ id }: { id: string }) {
   const toast = useToast();
-  const { data, error, loading, reload, setData } = useApi<{ shop: ShopWithStats }>(`/api/admin/shops/${encodeURIComponent(id)}`);
-  const activity = useApi<{ entries: ActivityEntry[] }>(`/api/admin/activity?shopId=${encodeURIComponent(id)}`);
+  const { data, error, loading, reload, setData } = useQuery<{ shop: ShopWithStats }>(`admin-shop:${id}`, async () => ({ shop: await adminService.getShop(id) }));
+  const activity = useQuery<{ entries: ActivityEntry[] }>(`admin-activity:${id}`, async () => ({ entries: await adminService.listActivity(id) }));
   const shop = data?.shop;
   useDocumentTitle(shop?.name ?? 'Shop');
 
@@ -58,13 +58,13 @@ export function AdminShopDetail({ id }: { id: string }) {
     if (Object.keys(errs).length) return;
     setSaving(true);
     try {
-      await api.put(`/api/admin/shops/${shop.id}`, values);
+      await adminService.updateShop(shop.id, values);
       await reload(true);
       activity.reload(true);
       toast('success', 'Shop details saved');
     } catch (err) {
-      if (err instanceof ApiError && err.field) setErrors({ [err.field]: err.message });
-      else toast('error', 'Could not save', err instanceof ApiError ? err.message : undefined);
+      if (err instanceof ServiceError && err.field) setErrors({ [err.field]: err.message });
+      else toast('error', 'Could not save', err instanceof ServiceError ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -75,7 +75,7 @@ export function AdminShopDetail({ id }: { id: string }) {
     try {
       await fn();
     } catch (err) {
-      toast('error', 'Action failed', err instanceof ApiError ? err.message : undefined);
+      toast('error', 'Action failed', err instanceof ServiceError ? err.message : undefined);
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -198,8 +198,8 @@ export function AdminShopDetail({ id }: { id: string }) {
         danger={active}
         onConfirm={() =>
           run(async () => {
-            const r = await api.patch<{ shop: ShopWithStats }>(`/api/admin/shops/${shop.id}/status`, { status: active ? 'inactive' : 'active' });
-            setData({ shop: { ...shop, ...r.shop } });
+            const updated = await adminService.setShopStatus(shop.id, active ? 'inactive' : 'active');
+            setData({ shop: updated });
             activity.reload(true);
             toast('success', active ? 'Shop deactivated' : 'Shop activated');
           })
@@ -215,8 +215,8 @@ export function AdminShopDetail({ id }: { id: string }) {
         confirmLabel="Reset password"
         onConfirm={() =>
           run(async () => {
-            const r = await api.post<{ credentials: { username: string; temporaryPassword: string } }>(`/api/admin/shops/${shop.id}/reset-password`);
-            setCreds({ username: r.credentials.username, password: r.credentials.temporaryPassword });
+            const c = await adminService.resetOwnerPassword(shop.id);
+            setCreds({ username: c.username, password: c.temporaryPassword });
             activity.reload(true);
           })
         }
@@ -236,7 +236,7 @@ export function AdminShopDetail({ id }: { id: string }) {
         confirmDisabled={deleteName !== shop.name}
         onConfirm={() =>
           run(async () => {
-            await api.del(`/api/admin/shops/${shop.id}`, { confirmName: deleteName });
+            await adminService.deleteShop(shop.id, deleteName);
             toast('success', 'Shop deleted', shop.name);
             navigate('/admin/shops', { replace: true });
           })

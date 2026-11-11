@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ReceiptText, Search } from 'lucide-react';
-import type { Order } from '../../../shared/types';
-import { useApi, usePolling } from '../../lib/useApi';
+import type { Order } from '../../shared/types';
+import { useQuery, usePolling } from '../../lib/useQuery';
+import { shopService } from '../../services';
 import { navigate, useDocumentTitle, useLocation } from '../../lib/router';
 import { Button, Card, EmptyState, ErrorState, Input, PageHeader, Skeleton, cx } from '../../components/ui';
 import { OrderRow } from './OrderRow';
@@ -33,8 +34,9 @@ export function ShopOrders() {
   }, [search]);
   useEffect(() => setLimit(PAGE), [status, q]);
 
-  const url = `/api/shop/orders?status=${status}&limit=${limit}${q ? `&q=${encodeURIComponent(q)}` : ''}`;
-  const { data, error, loading, reload } = useApi<{ orders: Order[]; total: number }>(url);
+  const { data, error, loading, reload } = useQuery<{ orders: Order[]; total: number }>(`orders:${status}:${limit}:${q}`, () =>
+    shopService.listOrders({ status: status as shopService.OrderFilter, limit, q }),
+  );
   usePolling(() => {
     reload(true);
     refreshCounts();

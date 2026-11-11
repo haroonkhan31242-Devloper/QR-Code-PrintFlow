@@ -2,88 +2,93 @@
 
 QR-based file sharing for print shops. A customer scans a shop's QR code, uploads documents from their phone (no account), and the shop owner downloads, prints and tracks the order from their dashboard.
 
-## Roles
-
-| Role | How they get in | What they can do |
-| --- | --- | --- |
-| **Super Admin** | `/admin/login` | Create, edit, activate/deactivate and delete shops; generate and reset shop-owner credentials; platform stats and activity log |
-| **Shop owner** | `/shop/login`, using credentials from the Super Admin | Only their own shop: incoming orders and files, order status, payment, prices, QR code, shop details, own password |
-| **Customer** | Scans the shop QR (`/s/<token>`) | Upload files and track an order with a tracking code. No login. |
-
-All permissions are enforced on the server. A shop owner's shop id always comes from their session, never from the URL or request body.
+**This build is frontend only.** There is no backend and no API. All data is kept in the browser as a mock database, so the app can be tested end to end and later connected to Supabase.
 
 ## Run locally
 
-Requires **Node.js 22.13+** (uses the built-in `node:sqlite`).
+Requires **Node.js 20.19+**.
 
 ```bash
 npm install
-cp .env.example .env     # then set SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD
-npm run dev              # http://localhost:3000
+npm run dev        # http://localhost:3000
 ```
 
-On first start the Super Admin account is created from `.env`. The password is temporary: you must choose a new one at first sign-in. If the variables are missing in development, a random password is printed to the console instead.
+Other scripts: `npm run build` (typecheck + production build into `dist/`), `npm run preview` (serve the build), `npm run lint` (typecheck).
 
-**Locked out of Super Admin?** Put the password you want in `SUPER_ADMIN_PASSWORD` in `.env`, then run `npm run reset-admin`. Sign in at `/admin/login` (not the shop page).
+## Demo accounts
 
-Data is stored in `./data` (SQLite database + uploaded files). Delete that folder to start fresh.
+Created automatically the first time the app opens in a browser (see `src/services/seed.ts`). They are test values for this local demo only.
 
-## Production
+| Role | Sign in at | Username | Password |
+| --- | --- | --- | --- |
+| Super Admin | `/admin/login` | `superadmin` | `Admin1234` |
+| Shop owner (Demo Print Shop) | `/shop/login` | `demoshop` | `Shop1234` |
 
-```bash
-npm run build
-npm start                # serves dist/ and the API, with secure cookies and a CSP
+Customer upload page for the demo shop: `/s/demoprint1`. Shops created by the Super Admin get a temporary password that must be changed at first sign-in.
+
+To start again from scratch: sign in as Super Admin → **Account → Reset demo data**.
+
+## Roles
+
+| Role | What they can do |
+| --- | --- |
+| **Super Admin** | Create, edit, activate/deactivate and delete shops; generate and reset shop-owner credentials; platform stats and activity log |
+| **Shop owner** | Only their own shop: orders and files, order status, payment, prices, QR code, shop details, own password |
+| **Customer** | Scan the shop QR (`/s/<token>`), upload files and track an order with its tracking code. No login. |
+
+## How data is stored
+
+| What | Where |
+| --- | --- |
+| Shops, users, sessions, prices, orders, order history, activity log | `localStorage` key `printflow:db` (one JSON document with a table per entity) |
+| Uploaded file contents (PDF, Word, images) | IndexedDB database `printflow-files` (Blobs, keyed by file id) |
+| Who is signed in on this browser | `localStorage` key `printflow:session` |
+
+Data survives a page refresh and is shared between tabs of the same browser (changes in one tab show up in the others).
+
+**Limits of a browser-only demo**
+
+- Data exists only in the browser where it was created. A phone scanning the QR code opens the shop's link in *its own* browser, which does not have the shop's data. To test the customer flow, open the upload link (or use **Scan a shop QR code** on the home page) in the same browser as the shop dashboard.
+- Passwords are hashed (PBKDF2), and every service checks the signed-in role, but anyone with access to the browser can read or change its storage. Real security needs a backend (e.g. Supabase Auth + Row Level Security).
+- Printing uses the browser's print dialog (selected files are merged into one PDF in the browser). One-click "direct to printer" printing needs a program on the shop PC and is not part of this build.
+
+## QR codes
+
+- **Generate:** Shop owner → **QR code** creates the QR image in the browser (`qrcode`), with print and PNG download.
+- **Scan:** Home page → **Scan a shop QR code** decodes with the camera or from a photo/screenshot of the code (`jsqr`), then opens the shop's upload page.
+
+## Project structure
+
+```
+src/
+  services/            Data layer — the only code that touches storage
+    index.ts           Public entry: authService, adminService, shopService, publicService
+    authService.ts     Sign in/out, current user, change password
+    adminService.ts    Super Admin: shops, owner accounts, stats, activity
+    shopService.ts     Shop owner: profile, orders, files, prices, QR, print bundle
+    publicService.ts   Customer: shop page, create order (with files), tracking
+    session.ts         Sessions and role checks
+    seed.ts            Demo data and reset
+    validate.ts        Input validation
+    crypto.ts          Ids, codes, password hashing (Web Crypto)
+    fileInspect.ts     File type checks and page counting
+    mappers.ts         Row → UI type conversion
+    storage/
+      localDb.ts       localStorage mock database
+      fileStore.ts     IndexedDB file storage
+  shared/              Types and the price calculator
+  lib/                 Router, auth context, useQuery hook, formatting
+  components/          UI kit, layout, toasts, QR scanner
+  pages/               public/, auth/, admin/, shop/
+docs/                  Original product spec
 ```
 
-Run behind HTTPS. Set `TRUST_PROXY=1` when behind a reverse proxy, and back up the `data/` folder.
+## Moving to Supabase later
 
-## Printing
+Pages and components never touch storage directly; they call the functions exported from `src/services`. To switch:
 
-Open an order → select files (all are selected by default) → **Print**. The original uploads are never changed; PDFs and images are merged into one print-ready PDF (images fitted to the order's paper size). Word files can't be printed from the browser: download them and print from Word.
+1. Create tables matching the row types in `src/services/storage/localDb.ts` and a Storage bucket for files.
+2. Re-implement each service module with the Supabase client, keeping the same function names and return types (throw `ServiceError` for errors).
+3. Replace `session.ts` with Supabase Auth and enforce shop ownership with Row Level Security.
 
-There are two ways to print:
-
-1. **Print dialog** (no setup). Opens the browser's print dialog for the merged PDF, where you choose the printer, copies and duplex.
-2. **Direct to printer** (one click, no dialog). Run the print agent on the PC that is connected to the printer:
-   - Dashboard → **Settings → Direct printing → Connect a print agent** and copy the command.
-   - On that PC, inside this project folder (`npm install` once), run:
-     ```bash
-     npm run print-agent -- --server http://YOUR-SERVER:3000 --token pfa_...
-     ```
-   - Keep the window open. The dashboard then shows the PC's printers; pick one, set copies/sides/colour, and press **Print now**. Job status (waiting, printing, printed, failed with reason) shows on the order.
-   - Windows prints through the bundled SumatraPDF; macOS/Linux use `lp`. Add `--dry-run` to save PDFs instead of printing.
-
-Only one agent per shop. "Create a new token" disconnects the old agent. A shop's agent can only see that shop's jobs.
-
-## Tests
-
-```bash
-npm run build && npm run test:api
-```
-
-Starts a throwaway server with its own temp data folder and checks 56 cases: logins per role, forced password change, shop isolation (other shops' orders/files by id), file-type validation, price calculation, QR replacement, deactivation and password reset.
-
-## Project layout
-
-```
-server/          Express API: auth, sessions, admin/shop/public routes, uploads, SQLite schema
-shared/          Types and price calculation used by both server and client
-src/             React app
-  components/    UI kit, dashboard layout, toasts
-  pages/public   Landing, customer upload, order tracking
-  pages/auth     Login, forced password change, account
-  pages/admin    Super Admin
-  pages/shop     Shop owner
-scripts/         API test
-_legacy/         Previous localStorage-only prototype, kept for reference (not built)
-docs/            Original frontend spec
-```
-
-## Security notes
-
-- Passwords hashed with scrypt; sessions are random tokens stored hashed, in an HttpOnly SameSite cookie.
-- Each role can only sign in on its own login page. Login is rate-limited.
-- Shop deactivation, password reset and password change revoke sessions immediately.
-- State-changing requests need a custom header (CSRF protection).
-- Uploads: extension allow-list **and** file-signature check, 25 MB per file, 10 files, random stored names outside the web root. Files are only served to the owning shop.
-- Shops can delete a finished order's files to protect customer privacy.
+No page or component should need to change.

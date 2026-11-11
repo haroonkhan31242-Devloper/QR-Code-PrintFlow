@@ -1,13 +1,14 @@
 import { History } from 'lucide-react';
-import type { ActivityEntry } from '../../../shared/types';
-import { useApi } from '../../lib/useApi';
+import type { ActivityEntry } from '../../shared/types';
+import { useQuery } from '../../lib/useQuery';
+import { adminService } from '../../services';
 import { Link, useDocumentTitle } from '../../lib/router';
 import { formatDateTime } from '../../lib/format';
 import { Card, EmptyState, ErrorState, PageHeader, Skeleton } from '../../components/ui';
 
 export function AdminActivity() {
   useDocumentTitle('Activity log');
-  const { data, error, loading, reload } = useApi<{ entries: ActivityEntry[] }>('/api/admin/activity');
+  const { data, error, loading, reload } = useQuery<{ entries: ActivityEntry[] }>('admin-activity', async () => ({ entries: await adminService.listActivity() }));
 
   return (
     <>

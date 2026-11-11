@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Plus, Search, Store } from 'lucide-react';
-import type { Shop, ShopWithStats } from '../../../shared/types';
-import { api, ApiError } from '../../lib/api';
-import { useApi } from '../../lib/useApi';
+import type { Shop, ShopWithStats } from '../../shared/types';
+import { adminService, ServiceError } from '../../services';
+import { useQuery } from '../../lib/useQuery';
 import { Link, navigate, useDocumentTitle, useLocation } from '../../lib/router';
 import { timeAgo } from '../../lib/format';
 import { Alert, Badge, Button, Card, EmptyState, ErrorState, Field, Input, Modal, PageHeader, PasswordInput, Select, Skeleton } from '../../components/ui';
@@ -13,7 +13,7 @@ import { ShopFields, emptyShopForm, validateShopForm, type ShopFormValues } from
 export function AdminShops() {
   useDocumentTitle('Shops');
   const { query } = useLocation();
-  const { data, error, loading, reload } = useApi<{ shops: ShopWithStats[] }>('/api/admin/shops');
+  const { data, error, loading, reload } = useQuery<{ shops: ShopWithStats[] }>('admin-shops', async () => ({ shops: await adminService.listShops() }));
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [creating, setCreating] = useState(query.get('new') === '1');
@@ -211,7 +211,7 @@ function CreateShopModal({
     if (Object.keys(errs).length) return;
     setSaving(true);
     try {
-      const r = await api.post<{ shop: Shop; credentials: { username: string; temporaryPassword: string } }>('/api/admin/shops', {
+      const r = await adminService.createShop({
         ...values,
         ownerUsername: ownerUsername.trim(),
         ownerPassword: passwordMode === 'custom' ? ownerPassword : undefined,
@@ -219,8 +219,8 @@ function CreateShopModal({
       toast('success', 'Shop created', r.shop.name);
       onCreated({ shop: r.shop, username: r.credentials.username, password: r.credentials.temporaryPassword });
     } catch (err) {
-      if (err instanceof ApiError && err.field) setErrors({ [err.field]: err.message });
-      else setFormError(err instanceof ApiError ? err.message : 'Could not create shop.');
+      if (err instanceof ServiceError && err.field) setErrors({ [err.field]: err.message });
+      else setFormError(err instanceof ServiceError ? err.message : 'Could not create shop.');
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock, Printer, ReceiptText, Wallet } from 'lucide-react';
-import type { Order, ShopStats } from '../../../shared/types';
-import { useApi, usePolling } from '../../lib/useApi';
+import type { Order, ShopStats } from '../../shared/types';
+import { useQuery, usePolling } from '../../lib/useQuery';
+import { shopService } from '../../services';
 import { Link, useDocumentTitle } from '../../lib/router';
 import { formatMoney } from '../../lib/format';
 import { Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatCard } from '../../components/ui';
@@ -11,8 +12,8 @@ import { OrderRow } from './OrderRow';
 export function ShopDashboard() {
   useDocumentTitle('Dashboard');
   const { shop } = useShop();
-  const stats = useApi<ShopStats>('/api/shop/stats');
-  const queue = useApi<{ orders: Order[]; total: number }>('/api/shop/orders?status=active&limit=6');
+  const stats = useQuery<ShopStats>('shop-stats', shopService.getStats);
+  const queue = useQuery<{ orders: Order[]; total: number }>('shop-queue', () => shopService.listOrders({ status: 'active', limit: 6 }));
   usePolling(() => {
     stats.reload(true);
     queue.reload(true);

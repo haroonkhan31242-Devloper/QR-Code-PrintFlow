@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { Copy, Download, ExternalLink, Printer, RefreshCw } from 'lucide-react';
-import type { Shop } from '../../../shared/types';
-import { api, ApiError } from '../../lib/api';
+import { shopService, ServiceError } from '../../services';
 import { useDocumentTitle } from '../../lib/router';
 import { Alert, Button, Card, CardHeader, PageHeader, Skeleton } from '../../components/ui';
 import { ConfirmModal } from '../../components/shared';
@@ -39,12 +38,11 @@ export function ShopQrCode() {
   const regenerate = async () => {
     setBusy(true);
     try {
-      const r = await api.post<{ shop: Shop }>('/api/shop/qr/regenerate');
-      setShop(r.shop);
+      setShop(await shopService.regenerateQr());
       toast('success', 'New QR code created', 'Print it and replace the old one at your counter.');
       setConfirm(false);
     } catch (err) {
-      toast('error', 'Could not create a new QR code', err instanceof ApiError ? err.message : undefined);
+      toast('error', 'Could not create a new QR code', err instanceof ServiceError ? err.message : undefined);
     } finally {
       setBusy(false);
     }
@@ -64,7 +62,7 @@ export function ShopQrCode() {
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-gold-ink">Scan to print</p>
             <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-ink">{shop.name}</h2>
             <div className="mt-6 rounded-2xl border border-line bg-white p-3">
-              {img ? <img src={img} alt={`QR code for ${shop.name}`} className="size-64 sm:size-72" /> : <Skeleton className="size-64 sm:size-72" />}
+              {img ? <img src={img} alt={`QR code for ${shop.name}`} className="aspect-square h-auto w-64 max-w-full sm:w-72" /> : <Skeleton className="size-64 sm:size-72" />}
             </div>
             <ol className="mt-6 space-y-1 text-sm text-ink-soft">
               <li>1. Open your phone camera and scan</li>

@@ -1,6 +1,7 @@
 import { Clock, HardDrive, ReceiptText, Store } from 'lucide-react';
-import type { AdminStats } from '../../../shared/types';
-import { useApi } from '../../lib/useApi';
+import type { AdminStats } from '../../shared/types';
+import { useQuery } from '../../lib/useQuery';
+import { adminService } from '../../services';
 import { Link, useDocumentTitle } from '../../lib/router';
 import { formatBytes } from '../../lib/format';
 import { Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatCard } from '../../components/ui';
@@ -8,7 +9,7 @@ import { WeekBars } from '../../components/shared';
 
 export function AdminDashboard() {
   useDocumentTitle('Overview');
-  const { data, error, loading, reload } = useApi<AdminStats>('/api/admin/stats');
+  const { data, error, loading, reload } = useQuery<AdminStats>('admin-stats', adminService.getStats);
 
   return (
     <>

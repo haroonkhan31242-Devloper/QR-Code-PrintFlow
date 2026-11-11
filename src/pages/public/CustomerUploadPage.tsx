@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock, Copy, FileText, MapPin, Minus, Phone, Plus, RefreshCw, Store, Trash2, UploadCloud, X } from 'lucide-react';
-import { ApiError, uploadWithProgress } from '../../lib/api';
-import { useApi } from '../../lib/useApi';
+import { publicService, ServiceError } from '../../services';
+import { docxPageCount, pdfPageCount } from '../../services/fileInspect';
+import { useQuery } from '../../lib/useQuery';
 import { Link, useDocumentTitle } from '../../lib/router';
 import { COLOR_LABEL, FINISHING_LABEL, formatBytes, formatMoney } from '../../lib/format';
-import { countPdfPages, estimatePrice } from '../../../shared/pricing';
+import { estimatePrice } from '../../shared/pricing';
 import {
   ALLOWED_UPLOAD_EXTENSIONS,
   MAX_UPLOAD_BYTES,
@@ -15,7 +16,7 @@ import {
   type PaperSize,
   type PublicShop,
   type Sides,
-} from '../../../shared/types';
+} from '../../shared/types';
 import { Button, Logo, Modal, Spinner, cx } from '../../components/ui';
 import { useToast } from '../../components/toast';
 
@@ -37,23 +38,17 @@ const isPdf = (f: File) => /\.pdf$/i.test(f.name);
 const extOf = (f: File) => f.name.split('.').pop()?.toUpperCase() ?? '';
 
 async function inspectFile(file: File): Promise<{ pages: number; known: boolean }> {
-  if (isPdf(file)) {
-    const buf = await file.arrayBuffer();
-    try {
-      // Loaded only when a PDF is added, so the page stays light.
-      const { PDFDocument } = await import('pdf-lib');
-      const doc = await PDFDocument.load(buf, { ignoreEncryption: true, updateMetadata: false });
-      return { pages: Math.max(1, doc.getPageCount()), known: true };
-    } catch {
-      try {
-        return { pages: countPdfPages(new TextDecoder('latin1').decode(buf)), known: true };
-      } catch {
-        return { pages: 1, known: false };
-      }
+  try {
+    if (isPdf(file)) return { pages: await pdfPageCount(file), known: true };
+    if (isImage(file)) return { pages: 1, known: true };
+    if (/\.docx$/i.test(file.name)) {
+      const pages = await docxPageCount(file);
+      if (pages) return { pages, known: true };
     }
+  } catch {
+    /* fall through */
   }
-  if (isImage(file)) return { pages: 1, known: true };
-  return { pages: 1, known: false }; // Word: counted on the server
+  return { pages: 1, known: false }; // old .doc files: the shop confirms the page count
 }
 
 function Screen({ children }: { children: React.ReactNode }) {
@@ -71,7 +66,7 @@ function CenteredCard({ children }: { children: React.ReactNode }) {
 }
 
 export function CustomerUploadPage({ token }: { token: string }) {
-  const { data, error, loading, reload } = useApi<{ shop: PublicShop }>(`/api/public/shops/${encodeURIComponent(token)}`);
+  const { data, error, loading, reload } = useQuery<{ shop: PublicShop }>(`public-shop:${token}`, async () => ({ shop: await publicService.getShopByToken(token) }));
   const shop = data?.shop;
   useDocumentTitle(shop ? `Print at ${shop.name}` : 'Send files to print');
 
@@ -227,27 +222,17 @@ function UploadScreen({ token, shop }: { token: string; shop: PublicShop }) {
       return;
     }
 
-    const form = new FormData();
-    files.forEach((f) => form.append('files', f.file, f.file.name));
-    form.append('customerName', name.trim());
-    form.append('customerPhone', phone.trim());
-    form.append('notes', notes.trim());
-    form.append('colorMode', effectiveColor);
-    form.append('paperSize', paperSize);
-    form.append('sides', sides);
-    form.append('copies', String(copies));
-    form.append('finishing', finishing);
-
     setProgress(0);
     try {
-      const r = await uploadWithProgress<{ trackingCode: string; orderNo: number; estimatedTotal: number }>(
-        `/api/public/shops/${encodeURIComponent(token)}/orders`,
-        form,
+      const r = await publicService.createOrder(
+        token,
+        { customerName: name.trim(), customerPhone: phone.trim(), notes: notes.trim(), colorMode: effectiveColor, paperSize, sides, copies, finishing },
+        files.map((f) => f.file),
         setProgress,
       );
       setDone(r);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : 'Upload failed. Please try again.');
+      setSubmitError(err instanceof ServiceError ? err.message : 'Upload failed. Please try again.');
     } finally {
       setProgress(null);
     }

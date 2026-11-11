@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import type { SessionUser } from '../../shared/types';
-import { api, onUnauthorized } from './api';
+import type { SessionUser } from '../shared/types';
+import { authService, onDbChange } from '../services';
 
 interface AuthState {
   user: SessionUser | null;
@@ -17,23 +17,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api
-      .get<{ user: SessionUser | null }>('/api/auth/me')
-      .then((r) => setUser(r.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
-    return onUnauthorized(() => setUser(null));
+    const check = () =>
+      authService
+        .getCurrentUser()
+        .then(setUser)
+        .catch(() => setUser(null));
+    check().finally(() => setLoading(false));
+    // Sign-outs, password resets and shop deactivation take effect immediately (also from other tabs).
+    return onDbChange(check);
   }, []);
 
   const login = useCallback(async (portal: 'admin' | 'shop', username: string, password: string) => {
-    const r = await api.post<{ user: SessionUser }>('/api/auth/login', { portal, username, password });
-    setUser(r.user);
-    return r.user;
+    const u = await authService.login(portal, username, password);
+    setUser(u);
+    return u;
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await api.post('/api/auth/logout');
+      await authService.logout();
     } finally {
       setUser(null);
     }
